@@ -1,0 +1,3 @@
+# RustBoi
+
+Rust gameboy emulator
