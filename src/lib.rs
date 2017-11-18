@@ -1,4 +1,5 @@
 mod cpu;
+mod memory;
 
 use cpu::Cpu;
 
@@ -19,9 +20,5 @@ impl Gameboy {
             video_ram: vec![0; RAM_SIZE].into_boxed_slice(),
             rom: rom.into_boxed_slice()
         }
-    }
-
-    pub fn load_rom(rom: Vec<u8>) {
-        main_ram = rom.into_boxed_slice();
     }
 }
