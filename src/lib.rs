@@ -1,60 +1,27 @@
-pub struct Cpu {
-    af: ComboRegister,
-    bc: ComboRegister,
-    de: ComboRegister,
-    hl: ComboRegister,
-    sp: u16,
-    pc: u16,
+mod cpu;
 
-    flags: Flags
+use cpu::Cpu;
+
+const RAM_SIZE: u32 = 8 * 1024
+
+pub struct Gameboy {
+    cpu: Cpu,
+    rom: Box<[u8]>,
+    main_ram: Box<[u8]>,
+    video_ram: Box<[u8]>
 }
 
-impl Cpu {
-    pub fn new() {
-        Cpu {
-            af: ComboRegister::new(),
-            bc: ComboRegister::new(),
-            de: ComboRegister::new(),
-            hl: ComboRegister::new(),
-            sp: 0,
-            pc: 0x100,
-            flags: Flags::new()
+impl Gameboy {
+    pub fn new(rom: Vec<u8>, cart_rom: Vec<u8>) {
+        Gameboy {
+            cpu: Cpu::new(),
+            main_ram: vec![0; RAM_SIZE].into_boxed_slice(),
+            video_ram: vec![0; RAM_SIZE].into_boxed_slice(),
+            rom: rom.into_boxed_slice()
         }
     }
-}
 
-struct Flags {
-    z: bool,
-    n: bool,
-    h: bool,
-    c: bool,
-}
-
-impl Flags {
-    fn new() {
-        Flags {
-            z: false,
-            n: false,
-            h: false,
-            c: false,
-        }
-    }
-}
-
-struct ComboRegister {
-    hi: u8,
-    lo: u8,
-}
-
-impl ComboRegister {
-    fn new() {
-        ComboRegister {
-            hi: 0,
-            lo: 0
-        }
-    }
-    fn combined(&self) {
-        return ((self.hi as u16) << 8) |
-               ((self.lo as u16));
+    pub fn load_rom(rom: Vec<u8>) {
+        main_ram = rom.into_boxed_slice();
     }
 }

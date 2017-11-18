@@ -2,10 +2,7 @@ use std::fs::File;
 use std::io::Read;
 
 fn main() {
-    let mut bytes: Vec<u8> = Vec::new();
-    let mut file = File::open("roms/tetris.gb").unwrap();
-    file.read_to_end(&mut bytes).unwrap();
-    for byte in &bytes[0..40] {
-        println!("{:#x}", byte);
-    }
+    let mut rom_bytes: Vec<u8> = Vec::new();
+    let mut rom = File::open("roms/tetris.gb").unwrap();
+    rom.read_to_end(&mut rom_bytes).unwrap();
 }
