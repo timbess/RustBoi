@@ -1,3 +1,5 @@
+use super::memory::Memory;
+
 pub struct Cpu {
     af: ComboRegister,
     bc: ComboRegister,
@@ -10,16 +12,24 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn new() {
+    pub fn new() -> Self {
         Cpu {
             af: ComboRegister::new(),
             bc: ComboRegister::new(),
             de: ComboRegister::new(),
             hl: ComboRegister::new(),
             sp: 0,
-            pc: 0x100,
+            pc: 0,
             flags: Flags::new()
         }
+    }
+
+    pub fn step(&self, memory: &mut Memory) {
+        if self.pc == 0x0100 {
+            memory.executed_bios();
+        }
+        let opcode = memory.read_byte(self.pc);
+        panic!("{:#x}", opcode);
     }
 }
 
@@ -31,7 +41,7 @@ struct Flags {
 }
 
 impl Flags {
-    fn new() {
+    fn new() -> Self {
         Flags {
             z: false,
             n: false,
@@ -47,13 +57,13 @@ struct ComboRegister {
 }
 
 impl ComboRegister {
-    fn new() {
+    fn new() -> Self {
         ComboRegister {
             hi: 0,
             lo: 0
         }
     }
-    fn combined(&self) {
+    fn combined(&self) -> u16 {
         return ((self.hi as u16) << 8) |
                ((self.lo as u16));
     }
