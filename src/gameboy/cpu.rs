@@ -44,6 +44,17 @@ impl Cpu {
             }
             0x32 => { // LDD (hl), a
                 memory.write_u8(self.hl.get_combined(), self.af.hi);
+                let new_hl = self.hl.get_combined()-1;
+                self.hl.set_combined(new_hl);
+            }
+            0xcb => { // Special multibyte instructions
+                let special_op = memory.read_u8(self.pc);
+                self.pc += 1;
+                match special_op {
+                    0x40 ... 0x7F => { // BIT operations
+                    }
+                    _ => panic!("Unknown special opcode: {:#x}", special_op)
+                }
             }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
