@@ -1,4 +1,5 @@
 use super::memory::Memory;
+use super::utils::bit_is_set;
 
 pub struct Cpu {
     af: ComboRegister,
@@ -51,7 +52,23 @@ impl Cpu {
                 let special_op = memory.read_u8(self.pc);
                 self.pc += 1;
                 match special_op {
-                    0x40 ... 0x7F => { // BIT operations
+                    0x40 ... 0x7f => { // BIT b, r operations
+                        let register = match (special_op & 0x0f) % 0x08 {
+                            0x00 => self.bc.hi,
+                            0x01 => self.bc.lo,
+                            0x02 => self.de.hi,
+                            0x03 => self.de.lo,
+                            0x04 => self.hl.hi,
+                            0x05 => self.hl.lo,
+                            0x06 => memory.read_u8(self.hl.get_combined()),
+                            0x07 => self.af.hi,
+                            _ => panic!("How the fuck did you break modulus?")
+                        };
+                        let bit_to_check = (special_op - 0x40) / 0x08;
+
+                        self.flags.zero = !bit_is_set(register, bit_to_check);
+                        self.flags.half_carry = true;
+                        self.flags.subtract = false;
                     }
                     _ => panic!("Unknown special opcode: {:#x}", special_op)
                 }
@@ -62,19 +79,19 @@ impl Cpu {
 }
 
 struct Flags {
-    z: bool,
-    n: bool,
-    h: bool,
-    c: bool,
+    zero: bool,
+    subtract: bool,
+    half_carry: bool,
+    carry: bool,
 }
 
 impl Flags {
     fn new() -> Self {
         Flags {
-            z: false,
-            n: false,
-            h: false,
-            c: false,
+            zero: false,
+            subtract: false,
+            half_carry: false,
+            carry: false,
         }
     }
 }
