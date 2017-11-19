@@ -48,11 +48,26 @@ impl Memory {
 
     pub fn write_u8(&mut self, addr: u16, value: u8) {
         let (memory_space, addr) = self.get_memory_space_with_addr(addr);
-        return memory_space.as_mut()[addr as usize] = value;
+        return memory_space[addr as usize] = value;
     }
 
     pub fn read_u16(&mut self, addr: u16) -> u16 {
         return ((self.read_u8(addr+1)   as u16) << 8) |
                ((self.read_u8(addr) as u16));
+    }
+
+    pub fn dump(&self) {
+        for bytes in Vec::from(self.main_ram.as_ref()).chunks(15) {
+            for byte in bytes {
+                print!("{:#x} ", byte);
+            }
+            println!();
+        }
+        for bytes in Vec::from(self.video_ram.as_ref()).chunks(15) {
+            for byte in bytes {
+                print!("{:#x} ", byte);
+            }
+            println!();
+        }
     }
 }
