@@ -23,7 +23,7 @@ impl Memory {
         self.executed_bios = true;
     }
 
-    pub fn read_byte(&self, addr: u16) -> u8 {
+    pub fn read_u8(&self, addr: u16) -> u8 {
         match addr & 0xF000 {
             0x0000 => {
                 if !self.executed_bios && addr < 0x0100 {
@@ -36,5 +36,10 @@ impl Memory {
                 panic!("Unknown memory region: {:#x}", addr);
             }
         }
+    }
+
+    pub fn read_u16(&self, addr: u16) -> u16 {
+        return ((self.read_u8(addr+1)   as u16) << 8) |
+               ((self.read_u8(addr) as u16));
     }
 }

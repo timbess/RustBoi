@@ -15,6 +15,8 @@ impl Gameboy {
     }
 
     pub fn run(&mut self) {
-        self.cpu.step(&mut self.memory);
+        loop {
+            self.cpu.step(&mut self.memory);
+        }
     }
 }

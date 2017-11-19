@@ -12,7 +12,7 @@ fn main() {
     rom.read_to_end(&mut rom_bytes).unwrap();
     let mut bios = File::open("roms/bios.gb").unwrap();
     bios.read_to_end(&mut bios_bytes).unwrap();
-    
+
     let mut gameboy = Gameboy::new(rom_bytes, bios_bytes);
     gameboy.run();
 }

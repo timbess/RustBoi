@@ -24,12 +24,29 @@ impl Cpu {
         }
     }
 
-    pub fn step(&self, memory: &mut Memory) {
+    pub fn step(&mut self, memory: &mut Memory) {
         if self.pc == 0x0100 {
             memory.executed_bios();
         }
-        let opcode = memory.read_byte(self.pc);
-        panic!("{:#x}", opcode);
+        let opcode = memory.read_u8(self.pc);
+        self.pc += 1;
+        match opcode {
+            0x31 => { // LD sp, nn
+                self.sp = memory.read_u16(self.pc);
+                self.pc += 2;
+            }
+            0xaf => { // XOR a
+                self.af.hi ^= self.af.hi;
+            }
+            0x21 => { // LD HL, nn
+                self.hl.set_combined(memory.read_u16(self.pc));
+                self.pc += 2;
+            }
+            0x32 => { // LDD (hl), a
+                
+            }
+            _ => panic!("Unknown opcode: {:#x}", opcode)
+        }
     }
 }
 
@@ -63,8 +80,14 @@ impl ComboRegister {
             lo: 0
         }
     }
-    fn combined(&self) -> u16 {
+
+    fn get_combined(&self) -> u16 {
         return ((self.hi as u16) << 8) |
-               ((self.lo as u16));
+               ((self.lo as u16) & 0x00ff);
+    }
+
+    fn set_combined(&mut self, combined: u16) {
+        self.hi = (combined >> 8) as u8;
+        self.lo = (combined & 0x00ff) as u8;
     }
 }
