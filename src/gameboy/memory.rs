@@ -23,19 +23,44 @@ impl Memory {
         self.executed_bios = true;
     }
 
-    pub fn read_u8(&self, addr: u16) -> u8 {
+    fn get_memory_space_with_addr(&self, addr: u16) -> (&Box<[u8]>, u16) {
         match addr & 0xF000 {
             0x0000 => {
                 if !self.executed_bios && addr < 0x0100 {
-                    return self.bios[addr as usize];
+                    return ((&self.bios), addr);
                 }
 
-                return self.rom[addr as usize];
+                return ((&self.rom), addr);
             }
             _ => {
                 panic!("Unknown memory region: {:#x}", addr);
             }
         }
+    }
+
+    fn get_memory_space_with_addr_mut(&mut self, addr: u16) -> (&mut Box<[u8]>, u16) {
+        match addr & 0xF000 {
+            0x0000 => {
+                if !self.executed_bios && addr < 0x0100 {
+                    return ((&mut self.bios), addr);
+                }
+
+                return ((&mut self.rom), addr);
+            }
+            _ => {
+                panic!("Unknown memory region: {:#x}", addr);
+            }
+        }
+    }
+
+    pub fn read_u8(&self, addr: u16) -> u8 {
+        let (memory_space, addr) = self.get_memory_space_with_addr(addr);
+        return memory_space[addr as usize];
+    }
+
+    pub fn write_u8(&mut self, addr: u16, value: u8) {
+        let (memory_space, addr) = self.get_memory_space_with_addr_mut(addr);
+        return memory_space[addr as usize] = value;
     }
 
     pub fn read_u16(&self, addr: u16) -> u16 {

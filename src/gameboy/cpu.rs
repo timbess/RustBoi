@@ -43,7 +43,7 @@ impl Cpu {
                 self.pc += 2;
             }
             0x32 => { // LDD (hl), a
-                
+                memory.write_u8(self.hl.get_combined(), self.af.hi);
             }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
