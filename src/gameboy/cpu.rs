@@ -29,19 +29,17 @@ impl Cpu {
         if self.pc == 0x0100 {
             memory.executed_bios();
         }
-        let opcode = memory.read_u8(self.pc);
-        self.pc += 1;
+        let opcode = self.read_u8_from_pc(memory);
         match opcode {
             0x31 => { // LD sp, nn
-                self.sp = memory.read_u16(self.pc);
-                self.pc += 2;
+                self.sp = self.read_u16_from_pc(memory);
             }
             0xaf => { // XOR a
                 self.af.hi ^= self.af.hi;
             }
             0x21 => { // LD HL, nn
-                self.hl.set_combined(memory.read_u16(self.pc));
-                self.pc += 2;
+                let data = self.read_u16_from_pc(memory);
+                self.hl.set_combined(data);
             }
             0x32 => { // LDD (hl), a
                 memory.write_u8(self.hl.get_combined(), self.af.hi);
@@ -49,8 +47,7 @@ impl Cpu {
                 self.hl.set_combined(new_hl);
             }
             0xcb => { // Special multibyte instructions
-                let special_op = memory.read_u8(self.pc);
-                self.pc += 1;
+                let special_op = self.read_u8_from_pc(memory);
                 match special_op {
                     0x40 ... 0x7f => { // BIT b, r operations
                         let register = match (special_op & 0x0f) % 0x08 {
@@ -75,12 +72,24 @@ impl Cpu {
             }
             0x20 => { // JR NZ, n
                 if !self.flags.zero {
-                    let offset = memory.read_u8(self.pc);
+                    let offset = self.read_u8_from_pc(memory);
                     self.pc += offset as u16;
                 }
             }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
+    }
+
+    fn read_u8_from_pc(&mut self, memory: &mut Memory) -> u8 {
+        let current_pc = self.pc;
+        self.pc += 1;
+        return memory.read_u8(current_pc);
+    }
+
+    fn read_u16_from_pc(&mut self, memory: &mut Memory) -> u16 {
+        let current_pc = self.pc;
+        self.pc += 2;
+        return memory.read_u16(current_pc);
     }
 }
 
