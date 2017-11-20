@@ -29,16 +29,16 @@ impl Cpu {
         if self.pc == 0x0100 {
             memory.executed_bios();
         }
-        let opcode = self.read_u8_from_pc(memory);
+        let opcode = self.read_u8_at_pc(memory);
         match opcode {
             0x31 => { // LD sp, nn
-                self.sp = self.read_u16_from_pc(memory);
+                self.sp = self.read_u16_at_pc(memory);
             }
             0xaf => { // XOR a
                 self.af.hi ^= self.af.hi;
             }
             0x21 => { // LD HL, nn
-                let data = self.read_u16_from_pc(memory);
+                let data = self.read_u16_at_pc(memory);
                 self.hl.set_combined(data);
             }
             0x32 => { // LDD (hl), a
@@ -47,7 +47,7 @@ impl Cpu {
                 self.hl.set_combined(new_hl);
             }
             0xcb => { // Special multibyte instructions
-                let special_op = self.read_u8_from_pc(memory);
+                let special_op = self.read_u8_at_pc(memory);
                 match special_op {
                     0x40 ... 0x7f => { // BIT b, r operations
                         let register = match (special_op & 0x0f) % 0x08 {
@@ -72,21 +72,165 @@ impl Cpu {
             }
             0x20 => { // JR NZ, n
                 if !self.flags.zero {
-                    let offset = self.read_u8_from_pc(memory);
+                    let offset = self.read_u8_at_pc(memory);
                     self.pc += offset as u16;
                 }
+            }
+            0x40 => { // LD B, B
+                self.bc.hi = self.bc.hi;
+            }
+            0x41 => { // LD B, C
+                self.bc.hi = self.bc.lo;
+            }
+            0x42 => { // LD B, D
+                self.bc.hi = self.de.hi;
+            }
+            0x43 => { // LD B, E
+                self.bc.hi = self.de.lo;
+            }
+            0x44 => { // LD B, H
+                self.bc.hi = self.hl.hi;
+            }
+            0x45 => { // LD B, L
+                self.bc.hi = self.hl.lo;
+            }
+            0x46 => { // LD B, (HL)
+                self.bc.hi = memory.read_u8(self.hl.get_combined());
+            }
+            0x47 => { // LD B, A
+                self.bc.hi = self.af.hi;
+            }
+            0x48 => { // LD C, B
+                self.bc.lo = self.bc.hi;
+            }
+            0x49 => { // LD C, C
+                self.bc.lo = self.bc.lo;
+            }
+            0x4a => { // LD C, D
+                self.bc.lo = self.de.hi;
+            }
+            0x4b => { // LD C, E
+                self.bc.lo = self.de.lo;
+            }
+            0x4c => { // LD C, H
+                self.bc.lo = self.hl.hi;
+            }
+            0x4d => { // LD C, L
+                self.bc.lo = self.hl.lo;
+            }
+            0x4e => { // LD C, (HL)
+                self.bc.lo = memory.read_u8(self.hl.get_combined());
+            }
+            0x4f => { // LD C, A
+                self.bc.lo = self.af.hi;
+            }
+            0x50 => { // LD D, B
+                self.de.hi = self.bc.hi;
+            }
+            0x51 => { // LD D, C
+                self.de.hi = self.bc.lo;
+            }
+            0x52 => { // LD D, D
+                self.de.hi = self.de.hi;
+            }
+            0x53 => { // LD D, E
+                self.de.hi = self.de.lo;
+            }
+            0x54 => { // LD D, H
+                self.de.hi = self.hl.hi;
+            }
+            0x55 => { // LD D, L
+                self.de.hi = self.hl.lo;
+            }
+            0x56 => { // LD D, (HL)
+                self.de.hi = memory.read_u8(self.hl.get_combined());
+            }
+            0x57 => { // LD D, A
+                self.de.hi = self.af.hi;
+            }
+            0x58 => { // LD E, B
+                self.de.lo = self.bc.hi;
+            }
+            0x59 => { // LD E, C
+                self.de.lo = self.bc.lo;
+            }
+            0x5a => { // LD E, D
+                self.de.lo = self.de.hi;
+            }
+            0x5b => { // LD E, E
+                self.de.lo = self.de.lo;
+            }
+            0x5c => { // LD E, H
+                self.de.lo = self.hl.hi;
+            }
+            0x5d => { // LD E, L
+                self.de.lo = self.hl.lo;
+            }
+            0x5e => { // LD E, (HL)
+                self.de.lo = memory.read_u8(self.hl.get_combined());
+            }
+            0x5f => { // LD E, A
+                self.de.lo = self.af.hi;
+            }
+            0x60 => { // LD H, B
+                self.hl.hi = self.bc.hi;
+            }
+            0x61 => { // LD H, C
+                self.hl.hi = self.bc.lo;
+            }
+            0x62 => { // LD H, D
+                self.hl.hi = self.de.hi;
+            }
+            0x63 => { // LD H, E
+                self.hl.hi = self.de.lo;
+            }
+            0x64 => { // LD H, H
+                self.hl.hi = self.hl.hi;
+            }
+            0x65 => { // LD H, L
+                self.hl.hi = self.hl.lo;
+            }
+            0x66 => { // LD H, (HL)
+                self.hl.hi = memory.read_u8(self.hl.get_combined());
+            }
+            0x67 => { // LD H, A
+                self.hl.hi = self.af.hi;
+            }
+            0x68 => { // LD L, B
+                self.hl.lo = self.bc.hi;
+            }
+            0x69 => { // LD L, C
+                self.hl.lo = self.bc.hi;
+            }
+            0x6a => { // LD L, D
+                self.hl.lo = self.de.hi;
+            }
+            0x6b => { // LD L, E
+                self.hl.lo = self.de.lo;
+            }
+            0x6c => { // LD L, H
+                self.hl.lo = self.hl.hi;
+            }
+            0x6d => { // LD L, L
+                self.hl.lo = self.hl.lo;
+            }
+            0x6e => { // LD L, (HL)
+                self.hl.lo = memory.read_u8(self.hl.get_combined());
+            }
+            0x6f => { // LD L, A
+                self.hl.lo = self.af.hi;
             }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
     }
 
-    fn read_u8_from_pc(&mut self, memory: &mut Memory) -> u8 {
+    fn read_u8_at_pc(&mut self, memory: &mut Memory) -> u8 {
         let current_pc = self.pc;
         self.pc += 1;
         return memory.read_u8(current_pc);
     }
 
-    fn read_u16_from_pc(&mut self, memory: &mut Memory) -> u16 {
+    fn read_u16_at_pc(&mut self, memory: &mut Memory) -> u16 {
         let current_pc = self.pc;
         self.pc += 2;
         return memory.read_u16(current_pc);
