@@ -19,7 +19,7 @@ impl Cpu {
             bc: ComboRegister::new(),
             de: ComboRegister::new(),
             hl: ComboRegister::new(),
-            sp: 0,
+            sp: 0xfffe,
             pc: 0,
             flags: Flags::new()
         }
@@ -34,8 +34,13 @@ impl Cpu {
             0x31 => { // LD sp, nn
                 self.sp = self.read_u16_at_pc(memory);
             }
-            0xaf => { // XOR a
-                self.af.hi ^= self.af.hi;
+            0xaf | 0xa8 | 0xa9 | 0xaa | 0xab | 0xac | 0xad | 0xae => { // XOR a
+                self.af.hi ^= self.get_register_value(memory, opcode);
+
+                self.flags.zero = self.af.hi == 0x00;
+                self.flags.subtract = false;
+                self.flags.half_carry = false;
+                self.flags.carry = false;
             }
             0x21 => { // LD HL, nn
                 let data = self.read_u16_at_pc(memory);
@@ -50,19 +55,8 @@ impl Cpu {
                 let special_op = self.read_u8_at_pc(memory);
                 match special_op {
                     0x40 ... 0x7f => { // BIT b, r operations
-                        let register = match (special_op & 0x0f) % 0x08 {
-                            0x00 => self.bc.hi,
-                            0x01 => self.bc.lo,
-                            0x02 => self.de.hi,
-                            0x03 => self.de.lo,
-                            0x04 => self.hl.hi,
-                            0x05 => self.hl.lo,
-                            0x06 => memory.read_u8(self.hl.get_combined()),
-                            0x07 => self.af.hi,
-                            _ => panic!("How the fuck did you break modulus?")
-                        };
                         let bit_to_check = (special_op - 0x40) / 0x08;
-
+                        let register = self.get_register_value(memory, special_op);
                         self.flags.zero = !bit_is_set(register, bit_to_check);
                         self.flags.half_carry = true;
                         self.flags.subtract = false;
@@ -70,11 +64,24 @@ impl Cpu {
                     _ => panic!("Unknown special opcode: {:#x}", special_op)
                 }
             }
-            0x20 => { // JR NZ, n
-                if !self.flags.zero {
-                    let offset = self.read_u8_at_pc(memory);
-                    self.pc += offset as u16;
+            0x20 | 0x28 | 0x30 | 0x38 => { // JR cc, n
+                match (opcode >> 3) & 0x03 {
+                    0x0 => { // NZ
+                        if self.flags.zero { return; }
+                    }
+                    0x1 => { // Z
+                        if !self.flags.zero { return; }
+                    }
+                    0x2 => { // NC
+                        if self.flags.carry { return; }
+                    }
+                    0x3 => { // C
+                        if !self.flags.carry { return; }
+                    }
+                    _ => { panic!("Invalid Jump opcode: {:#x}", opcode); }
                 }
+                let offset = self.read_u8_at_pc(memory);
+                self.pc += offset as u16;
             }
             0x40 => { // LD B, B
                 self.bc.hi = self.bc.hi;
@@ -268,8 +275,73 @@ impl Cpu {
             0x7f => { // LD A, A
                 self.af.hi = self.af.hi;
             }
+            0xc4 | 0xcc | 0xd4 | 0xdc => { // CALL cc, nn
+                match (opcode >> 3) & 0x03 {
+                    0x0 => { // NZ
+                        if self.flags.zero { return; }
+                    }
+                    0x1 => { // Z
+                        if !self.flags.zero { return; }
+                    }
+                    0x2 => { // NC
+                        if self.flags.carry { return; }
+                    }
+                    0x3 => { // C
+                        if !self.flags.carry { return; }
+                    }
+                    _ => { panic!("Invalid Call opcode: {:#x}", opcode); }
+                }
+
+                let jump_to_addr = self.read_u16_at_pc(memory);
+                self.call(memory, jump_to_addr);
+            }
+            0xcd => { // CALL nn
+                let jump_to_addr = self.read_u16_at_pc(memory);
+                self.call(memory, jump_to_addr);
+            }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
+    }
+
+    fn get_register_value(&mut self, memory: &mut Memory, opcode: u8) -> u8 {
+        match (opcode & 0x0f) % 0x08 {
+            0x00 => self.bc.hi,
+            0x01 => self.bc.lo,
+            0x02 => self.de.hi,
+            0x03 => self.de.lo,
+            0x04 => self.hl.hi,
+            0x05 => self.hl.lo,
+            0x06 => memory.read_u8(self.hl.get_combined()),
+            0x07 => self.af.hi,
+            _ => panic!("How the fuck did you break modulus?")
+        }
+    }
+
+    fn call(&mut self, memory: &mut Memory, jump_to_addr: u16) {
+        let current_pc = self.pc;
+        self.push_stack_u16(memory, current_pc);
+        self.pc = jump_to_addr;
+    }
+
+    fn push_stack_u16(&mut self, memory: &mut Memory, value: u16) {
+        self.push_stack_u8(memory, (value >> 8) as u8);
+        self.push_stack_u8(memory, (value & 0x00FF) as u8);
+    }
+
+    fn pop_stack_u16(&mut self, memory: &mut Memory) -> u16 {
+        let higher = self.pop_stack_u8(memory);
+        let lower = self.pop_stack_u8(memory);
+        ((higher as u16) << 8) | ((lower as u16) & 0x00ff)
+    }
+
+    fn push_stack_u8(&mut self, memory: &mut Memory, value: u8) {
+        memory.write_u8(self.sp, value);
+        self.sp -= 1;
+    }
+
+    fn pop_stack_u8(&mut self, memory: &mut Memory) -> u8 {
+        self.sp += 1;
+        memory.read_u8(self.sp)
     }
 
     fn read_u8_at_pc(&mut self, memory: &mut Memory) -> u8 {
