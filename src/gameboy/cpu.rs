@@ -73,6 +73,12 @@ impl Cpu {
                     _ => panic!("Unknown special opcode: {:#x}", special_op)
                 }
             }
+            0x20 => { // JR NZ, n
+                if !self.flags.zero {
+                    let offset = memory.read_u8(self.pc);
+                    self.pc += offset as u16;
+                }
+            }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
     }
