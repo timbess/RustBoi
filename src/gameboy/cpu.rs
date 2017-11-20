@@ -220,6 +220,54 @@ impl Cpu {
             0x6f => { // LD L, A
                 self.hl.lo = self.af.hi;
             }
+            0x70 => { // LD (HL), B
+                memory.write_u8(self.hl.get_combined(), self.bc.hi);
+            }
+            0x71 => { // LD (HL), C
+                memory.write_u8(self.hl.get_combined(), self.bc.lo);
+            }
+            0x72 => { // LD (HL), D
+                memory.write_u8(self.hl.get_combined(), self.de.hi);
+            }
+            0x73 => { // LD (HL), E
+                memory.write_u8(self.hl.get_combined(), self.de.lo);
+            }
+            0x74 => { // LD (HL), H
+                memory.write_u8(self.hl.get_combined(), self.hl.hi);
+            }
+            0x75 => { // LD (HL), L
+                memory.write_u8(self.hl.get_combined(), self.hl.lo);
+            }
+            0x76 => { // HALT
+                panic!("HALT not implemented"); // TODO
+            }
+            0x77 => { // LD (HL), A
+                memory.write_u8(self.hl.get_combined(), self.af.hi);
+            }
+            0x78 => { // LD A, B
+                self.af.hi = self.bc.hi;
+            }
+            0x79 => { // LD A, C
+                self.af.hi = self.bc.lo;
+            }
+            0x7a => { // LD A, D
+                self.af.hi = self.de.hi;
+            }
+            0x7b => { // LD A, E
+                self.af.hi = self.de.lo;
+            }
+            0x7c => { // LD A, H
+                self.af.hi = self.hl.hi;
+            }
+            0x7d => { // LD A, L
+                self.af.hi = self.hl.lo;
+            }
+            0x7e => { // LD A, (HL)
+                self.af.hi = memory.read_u8(self.hl.get_combined());
+            }
+            0x7f => { // LD A, A
+                self.af.hi = self.af.hi;
+            }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
     }
