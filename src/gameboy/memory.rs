@@ -2,13 +2,15 @@ pub struct Memory {
     main_ram: Box<[u8]>,
     video_ram: Box<[u8]>,
     bios: Box<[u8]>,
+    mapped_io: Box<[u8]>,
     zero_page: Box<[u8]>,
     rom: Box<[u8]>,
-    executed_bios: bool
+    executed_bootloader: bool
 }
 
 const RAM_SIZE: usize = 8 * 1024;
-const ZERO_PAGE_SIZE: usize = 8 * 128;
+const ZERO_PAGE_SIZE: usize = 128;
+const MEMORY_MAPPED_IO: usize = 128;
 
 impl Memory {
     pub fn new(rom: Vec<u8>, cart_rom: Vec<u8>) -> Self {
@@ -16,20 +18,21 @@ impl Memory {
             main_ram: vec![0; RAM_SIZE].into_boxed_slice(),
             video_ram: vec![0; RAM_SIZE].into_boxed_slice(),
             bios: cart_rom.into_boxed_slice(),
+            mapped_io: vec![0; MEMORY_MAPPED_IO].into_boxed_slice(),
             zero_page: vec![0; ZERO_PAGE_SIZE].into_boxed_slice(),
             rom: rom.into_boxed_slice(),
-            executed_bios: false
+            executed_bootloader: false
         }
     }
 
-    pub fn executed_bios(&mut self) {
-        self.executed_bios = true;
+    fn executed_bootloader(&mut self) -> bool {
+        self.mapped_io[0x0050] == 1
     }
 
     fn get_memory_space_with_addr(&mut self, addr: u16) -> (&mut Box<[u8]>, u16) {
-        match addr & 0xF000 {
+        match addr {
             0x0000 ... 0x7fff => {
-                if !self.executed_bios && addr < 0x0100 {
+                if !self.executed_bootloader() && addr < 0x0100 {
                     return ((&mut self.bios), addr);
                 }
 
@@ -38,7 +41,10 @@ impl Memory {
             0x8000 ... 0x9fff => {
                 return ((&mut self.video_ram), addr - 0x8000);
             }
-            0xFF80 ... 0xfffe => {
+            0xff00 ... 0xff7f => {
+                return ((&mut self.mapped_io), addr - 0xff00);
+            }
+            0xff80 ... 0xfffe => {
                 return ((&mut self.zero_page), addr - 0x0FF80);
             }
             _ => {

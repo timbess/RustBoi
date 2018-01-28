@@ -26,15 +26,9 @@ impl Cpu {
     }
 
     pub fn step(&mut self, memory: &mut Memory) {
-        if self.pc == 0x0100 {
-            memory.executed_bios();
-        }
         let opcode = self.read_u8_at_pc(memory);
         println!("opcode: {:#x}", opcode);
         match opcode {
-            0x31 => { // LD sp, nn
-                self.sp = self.read_u16_at_pc(memory);
-            }
             0xaf | 0xa8 | 0xa9 | 0xaa | 0xab | 0xac | 0xad | 0xae => { // XOR a
                 self.af.hi ^= self.get_register_value(memory, opcode);
 
@@ -43,11 +37,7 @@ impl Cpu {
                 self.flags.half_carry = false;
                 self.flags.carry = false;
             }
-            0x21 => { // LD HL, nn
-                let data = self.read_u16_at_pc(memory);
-                self.hl.set_combined(data);
-            }
-            0x32 => { // LDD (hl), a
+            0x32 => { // LDD (HL-), A
                 memory.write_u8(self.hl.get_combined(), self.af.hi);
                 let new_hl = self.hl.get_combined()-1;
                 self.hl.set_combined(new_hl);
@@ -86,6 +76,30 @@ impl Cpu {
                 println!("Jumping by offset: '{:#x}'", offset);
                 self.pc = (self.pc as i16 + offset as i16) as u16;
             }
+            0x01 => { // LD BC, nn
+                let value = self.read_u16_at_pc(memory);
+                self.bc.set_combined(value);
+            }
+            0x11 => { // LD DE, nn
+                let value = self.read_u16_at_pc(memory);
+                self.de.set_combined(value);
+            }
+            0x21 => { // LD HL, nn
+                let value = self.read_u16_at_pc(memory);
+                self.hl.set_combined(value);
+            }
+            0x31 => { // LD SP, nn
+                self.sp = self.read_u16_at_pc(memory);
+            }
+            0xe0 => { // LD (n), A
+                let addr = 0xff00 + (self.read_u8_at_pc(memory) as u16);
+                memory.write_u8(addr, self.af.hi);
+            }
+            0x1a => { self.af.hi = memory.read_u8(self.de.get_combined()); } // LD A, (DE)
+            0x06 => { self.bc.hi = self.read_u8_at_pc(memory); } // LD B, n
+            0xe2 => { memory.write_u8(0xff00 + (self.bc.lo as u16), self.af.hi); } // LD (C), A
+            0x0e => { self.bc.lo = self.read_u8_at_pc(memory) } // LD C, n
+            0x3e => { self.af.hi = self.read_u8_at_pc(memory) } // LD A, n
             0x40 => { self.bc.hi = self.bc.hi; } // LD B, B
             0x41 => { self.bc.hi = self.bc.lo; } // LD B, C
             0x42 => { self.bc.hi = self.de.hi; } // LD B, D
@@ -173,6 +187,11 @@ impl Cpu {
             0xcd => { // CALL nn
                 let jump_to_addr = self.read_u16_at_pc(memory);
                 self.call(memory, jump_to_addr);
+            }
+            0x0c => { self.bc.lo += 1 } // INC C
+            0xc5 => { // PUSH BC
+                let value = self.bc.get_combined();
+                self.push_stack_u16(memory, value);
             }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
