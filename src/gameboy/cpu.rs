@@ -50,8 +50,20 @@ impl Cpu {
                         self.af.set_flag_lo(Flags::HalfCarry(true));
                         self.af.set_flag_lo(Flags::Subtract(false));
                     }
+                    0x11 => { // RL C
+                        let carry_bit = (self.bc.lo & 0x80) == 0x80;
+                        self.bc.lo <<= 1;
+                        self.bc.hi |= self.af.check_flag_low(Flags::Carry(true)) as u8;
+                        self.af.set_flag_lo(Flags::Carry(carry_bit));
+                    }
                     _ => panic!("Unknown special opcode: {:#x}", special_op)
                 }
+            }
+            0x17 => { // RL A
+                let carry_bit = (self.af.hi & 0x80) == 0x80;
+                self.af.hi <<= 1;
+                self.af.hi |= self.af.check_flag_low(Flags::Carry(true)) as u8;
+                self.af.set_flag_lo(Flags::Carry(carry_bit));
             }
             0x20 | 0x28 | 0x30 | 0x38 => { // JR cc, n
                 let offset = self.read_u8_at_pc(memory) as i8;
@@ -185,10 +197,29 @@ impl Cpu {
                 let jump_to_addr = self.read_u16_at_pc(memory);
                 self.call(memory, jump_to_addr);
             }
-            0x0c => { self.bc.lo += 1 } // INC C
+            0x0c => { // INC C
+                let half_carry_bit = self.bc.lo & 0x10;
+                self.bc.lo += 1;
+                self.af.set_flag_lo(Flags::Zero(self.bc.lo == 0));
+                self.af.set_flag_lo(Flags::Subtract(false));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit != (self.bc.lo & 0x10)));
+                self.af.set_flag_lo(Flags::Carry(self.bc.lo == 0));
+            }
+            0x05 => { // DEC B
+                let half_carry_bit = self.bc.hi & 0x10;
+                self.bc.hi -= 1;
+                self.af.set_flag_lo(Flags::Zero(self.bc.hi == 0));
+                self.af.set_flag_lo(Flags::Subtract(false));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit != (self.bc.lo & 0x10)));
+                self.af.set_flag_lo(Flags::Carry(self.bc.lo == 0xff));
+            }
             0xc5 => { // PUSH BC
                 let value = self.bc.get_combined();
                 self.push_stack_u16(memory, value);
+            }
+            0xc1 => { // POP BC
+                let value = self.pop_stack_u16(memory);
+                self.bc.set_combined(value);
             }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
