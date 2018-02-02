@@ -8,8 +8,6 @@ pub struct Cpu {
     hl: ComboRegister,
     sp: u16,
     pc: u16,
-
-    flags: Flags
 }
 
 impl Cpu {
@@ -21,7 +19,6 @@ impl Cpu {
             hl: ComboRegister::new(),
             sp: 0xfffe,
             pc: 0,
-            flags: Flags::new()
         }
     }
 
@@ -31,11 +28,11 @@ impl Cpu {
         match opcode {
             0xaf | 0xa8 | 0xa9 | 0xaa | 0xab | 0xac | 0xad | 0xae => { // XOR a
                 self.af.hi ^= self.get_register_value(memory, opcode);
-
-                self.flags.zero = self.af.hi == 0x00;
-                self.flags.subtract = false;
-                self.flags.half_carry = false;
-                self.flags.carry = false;
+                let new_zero = self.af.hi == 0x00;
+                self.af.set_flag_lo(Flags::Zero(new_zero));
+                self.af.set_flag_lo(Flags::Subtract(false));
+                self.af.set_flag_lo(Flags::HalfCarry(false));
+                self.af.set_flag_lo(Flags::Carry(false));
             }
             0x32 => { // LDD (HL-), A
                 memory.write_u8(self.hl.get_combined(), self.af.hi);
@@ -49,9 +46,9 @@ impl Cpu {
                     0x40 ... 0x7f => { // BIT b, r operations
                         let bit_to_check = (special_op - 0x40) / 0x08;
                         let register = self.get_register_value(memory, special_op);
-                        self.flags.zero = !bit_is_set(register, bit_to_check);
-                        self.flags.half_carry = true;
-                        self.flags.subtract = false;
+                        self.af.set_flag_lo(Flags::Zero(!bit_is_set(register, bit_to_check)));
+                        self.af.set_flag_lo(Flags::HalfCarry(true));
+                        self.af.set_flag_lo(Flags::Subtract(false));
                     }
                     _ => panic!("Unknown special opcode: {:#x}", special_op)
                 }
@@ -60,16 +57,16 @@ impl Cpu {
                 let offset = self.read_u8_at_pc(memory) as i8;
                 match (opcode >> 3) & 0x03 {
                     0x0 => { // NZ
-                        if self.flags.zero { return; }
+                        if self.af.check_flag_low(Flags::Zero(true)) { return; }
                     }
                     0x1 => { // Z
-                        if !self.flags.zero { return; }
+                        if self.af.check_flag_low(Flags::Zero(false)) { return; }
                     }
                     0x2 => { // NC
-                        if self.flags.carry { return; }
+                        if self.af.check_flag_low(Flags::Carry(true)) { return; }
                     }
                     0x3 => { // C
-                        if !self.flags.carry { return; }
+                        if self.af.check_flag_low(Flags::Carry(false)) { return; }
                     }
                     _ => { panic!("Invalid Jump opcode: {:#x}", opcode); }
                 }
@@ -168,16 +165,16 @@ impl Cpu {
                 let jump_to_addr = self.read_u16_at_pc(memory);
                 match (opcode >> 3) & 0x03 {
                     0x0 => { // NZ
-                        if self.flags.zero { return; }
+                        if self.af.check_flag_low(Flags::Zero(true)) { return; }
                     }
                     0x1 => { // Z
-                        if !self.flags.zero { return; }
+                        if self.af.check_flag_low(Flags::Zero(false)) { return; }
                     }
                     0x2 => { // NC
-                        if self.flags.carry { return; }
+                        if self.af.check_flag_low(Flags::Carry(true)) { return; }
                     }
                     0x3 => { // C
-                        if !self.flags.carry { return; }
+                        if self.af.check_flag_low(Flags::Carry(false)) { return; }
                     }
                     _ => { panic!("Invalid Call opcode: {:#x}", opcode); }
                 }
@@ -251,22 +248,11 @@ impl Cpu {
     }
 }
 
-struct Flags {
-    zero: bool,
-    subtract: bool,
-    half_carry: bool,
-    carry: bool,
-}
-
-impl Flags {
-    fn new() -> Self {
-        Flags {
-            zero: false,
-            subtract: false,
-            half_carry: false,
-            carry: false,
-        }
-    }
+enum Flags {
+    Zero(bool),
+    Subtract(bool),
+    HalfCarry(bool),
+    Carry(bool)
 }
 
 struct ComboRegister {
@@ -290,5 +276,35 @@ impl ComboRegister {
     fn set_combined(&mut self, combined: u16) {
         self.hi = (combined >> 8) as u8;
         self.lo = (combined & 0x00ff) as u8;
+    }
+
+    fn set_flag_lo(&mut self, flag: Flags) {
+        match flag {
+            Flags::Zero(value) => { self.lo |= (value as u8) << 7 }
+            Flags::Subtract(value) => { self.lo |= (value as u8) << 6 }
+            Flags::HalfCarry(value) => { self.lo |= (value as u8) << 5 }
+            Flags::Carry(value) => { self.lo |= (value as u8) << 4 }
+        }
+    }
+
+    fn check_flag_low(&self, flag: Flags) -> bool {
+        match flag {
+            Flags::Zero(value) => {
+                let check_bit = (value as u8) << 7;
+                (self.lo & check_bit) == check_bit
+            }
+            Flags::Subtract(value) => {
+                let check_bit = (value as u8) << 6;
+                (self.lo & check_bit) == check_bit
+            }
+            Flags::HalfCarry(value) => {
+                let check_bit = (value as u8) << 5;
+                (self.lo & check_bit) == check_bit
+            }
+            Flags::Carry(value) => {
+                let check_bit = (value as u8) << 4;
+                (self.lo & check_bit) == check_bit
+            }
+        }
     }
 }
