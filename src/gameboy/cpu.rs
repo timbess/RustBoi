@@ -107,6 +107,11 @@ impl Cpu {
             0x1a => { self.af.hi = memory.read_u8(self.de.get_combined()); } // LD A, (DE)
             0x06 => { self.bc.hi = self.read_u8_at_pc(memory); } // LD B, n
             0xe2 => { memory.write_u8(0xff00 + (self.bc.lo as u16), self.af.hi); } // LD (C), A
+            0x22 => { // LDI (HL), A
+                let address = self.hl.get_combined();
+                memory.write_u8(address, self.af.hi);
+                self.hl.set_combined(address + 1);
+             }
             0x0e => { self.bc.lo = self.read_u8_at_pc(memory) } // LD C, n
             0x3e => { self.af.hi = self.read_u8_at_pc(memory) } // LD A, n
             0x40 => { self.bc.hi = self.bc.hi; } // LD B, B
@@ -198,19 +203,27 @@ impl Cpu {
                 self.call(memory, jump_to_addr);
             }
             0x0c => { // INC C
-                let half_carry_bit = self.bc.lo & 0x10;
+                let half_carry_bit = (self.bc.lo & 0x08) == 0x08;
                 self.bc.lo += 1;
                 self.af.set_flag_lo(Flags::Zero(self.bc.lo == 0));
                 self.af.set_flag_lo(Flags::Subtract(false));
-                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit != (self.bc.lo & 0x10)));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((self.bc.lo & 0x08) == 0)));
                 self.af.set_flag_lo(Flags::Carry(self.bc.lo == 0));
             }
+            0x23 => { // INC HL
+                let half_carry_bit = self.hl.get_combined() & 0x0800 == 0x0800;
+                self.bc.lo += 1;
+                self.af.set_flag_lo(Flags::Zero(self.hl.get_combined() == 0));
+                self.af.set_flag_lo(Flags::Subtract(false));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((self.hl.get_combined() & 0x0800) == 0)));
+                self.af.set_flag_lo(Flags::Carry(self.hl.get_combined() == 0));
+            }
             0x05 => { // DEC B
-                let half_carry_bit = self.bc.hi & 0x10;
+                let half_carry_bit = (self.bc.lo & 0x08) == 0;
                 self.bc.hi -= 1;
                 self.af.set_flag_lo(Flags::Zero(self.bc.hi == 0));
                 self.af.set_flag_lo(Flags::Subtract(false));
-                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit != (self.bc.lo & 0x10)));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((self.bc.hi & 0x08) == 0x08)));
                 self.af.set_flag_lo(Flags::Carry(self.bc.lo == 0xff));
             }
             0xc5 => { // PUSH BC
