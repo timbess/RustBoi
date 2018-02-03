@@ -23,8 +23,9 @@ impl Cpu {
     }
 
     pub fn step(&mut self, memory: &mut Memory) {
+        let opcode_addr = self.pc;
         let opcode = self.read_u8_at_pc(memory);
-        println!("opcode: {:#x}", opcode);
+        println!("{:#x} opcode: {:#x}", opcode_addr, opcode);
         match opcode {
             0xaf | 0xa8 | 0xa9 | 0xaa | 0xab | 0xac | 0xad | 0xae => { // XOR a
                 self.af.hi ^= self.get_register_value(memory, opcode);
@@ -234,6 +235,10 @@ impl Cpu {
                 let value = self.pop_stack_u16(memory);
                 self.bc.set_combined(value);
             }
+            0xc9 => { // RET
+                let addr = self.pop_stack_u16(memory);
+                self.pc = addr;
+            }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
     }
@@ -264,8 +269,8 @@ impl Cpu {
     }
 
     fn pop_stack_u16(&mut self, memory: &mut Memory) -> u16 {
-        let higher = self.pop_stack_u8(memory);
         let lower = self.pop_stack_u8(memory);
+        let higher = self.pop_stack_u8(memory);
         ((higher as u16) << 8) | ((lower as u16) & 0x00ff)
     }
 
