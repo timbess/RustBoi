@@ -7,10 +7,10 @@ pub struct Gameboy {
 }
 
 impl Gameboy {
-    pub fn new(rom: Vec<u8>, cart_rom: Vec<u8>) -> Self {
+    pub fn new(rom: Vec<u8>, bootrom: Vec<u8>) -> Self {
         Gameboy {
             cpu: Cpu::new(),
-            memory: Memory::new(rom, cart_rom)
+            memory: Memory::new(rom, bootrom)
         }
     }
 
