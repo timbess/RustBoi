@@ -67,7 +67,7 @@ impl Cpu {
                 self.af.set_flag_lo(Flags::Carry(carry_bit));
             }
             0x20 | 0x28 | 0x30 | 0x38 => { // JR cc, n
-                let offset = self.read_u8_at_pc(memory) as i8;
+                let offset = self.read_i8_at_pc(memory);
                 match (opcode >> 3) & 0x03 {
                     0x0 => { // NZ
                         if self.af.check_flag_low(Flags::Zero(true)) { return; }
@@ -83,6 +83,11 @@ impl Cpu {
                     }
                     _ => { panic!("Invalid Jump opcode: {:#x}", opcode); }
                 }
+                println!("Jumping by offset: '{:#x}'", offset);
+                self.pc = (self.pc as i16 + offset as i16) as u16;
+            }
+            0x18 => { // JR n
+                let offset = self.read_i8_at_pc(memory);
                 println!("Jumping by offset: '{:#x}'", offset);
                 self.pc = (self.pc as i16 + offset as i16) as u16;
             }
@@ -105,6 +110,10 @@ impl Cpu {
                 let addr = 0xff00 + (self.read_u8_at_pc(memory) as u16);
                 memory.write_u8(addr, self.af.hi);
             }
+            0xea => { // LD (nn), A
+                let addr = self.read_u16_at_pc(memory);
+                memory.write_u8(addr, self.af.hi);
+            }
             0x1a => { self.af.hi = memory.read_u8(self.de.get_combined()); } // LD A, (DE)
             0x06 => { self.bc.hi = self.read_u8_at_pc(memory); } // LD B, n
             0xe2 => { memory.write_u8(0xff00 + (self.bc.lo as u16), self.af.hi); } // LD (C), A
@@ -114,6 +123,7 @@ impl Cpu {
                 self.hl.set_combined(address + 1);
              }
             0x0e => { self.bc.lo = self.read_u8_at_pc(memory) } // LD C, n
+            0x2e => { self.hl.lo = self.read_u8_at_pc(memory) } // LD L, n
             0x3e => { self.af.hi = self.read_u8_at_pc(memory) } // LD A, n
             0x40 => { self.bc.hi = self.bc.hi; } // LD B, B
             0x41 => { self.bc.hi = self.bc.lo; } // LD B, C
@@ -203,29 +213,65 @@ impl Cpu {
                 let jump_to_addr = self.read_u16_at_pc(memory);
                 self.call(memory, jump_to_addr);
             }
-            0x0c => { // INC C
-                let half_carry_bit = (self.bc.lo & 0x08) == 0x08;
-                self.bc.lo += 1;
-                self.af.set_flag_lo(Flags::Zero(self.bc.lo == 0));
-                self.af.set_flag_lo(Flags::Subtract(false));
-                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((self.bc.lo & 0x08) == 0)));
-                self.af.set_flag_lo(Flags::Carry(self.bc.lo == 0));
-            }
             0x23 => { // INC HL
                 let half_carry_bit = self.hl.get_combined() & 0x0800 == 0x0800;
-                self.bc.lo += 1;
-                self.af.set_flag_lo(Flags::Zero(self.hl.get_combined() == 0));
+                let new_hl = self.hl.get_combined() + 1;
+                self.hl.set_combined(new_hl);
+                self.af.set_flag_lo(Flags::Zero(new_hl == 0));
                 self.af.set_flag_lo(Flags::Subtract(false));
-                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((self.hl.get_combined() & 0x0800) == 0)));
-                self.af.set_flag_lo(Flags::Carry(self.hl.get_combined() == 0));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((new_hl & 0x0800) == 0)));
+                self.af.set_flag_lo(Flags::Carry(new_hl == 0));
             }
-            0x05 => { // DEC B
-                let half_carry_bit = (self.bc.lo & 0x08) == 0;
-                self.bc.hi -= 1;
-                self.af.set_flag_lo(Flags::Zero(self.bc.hi == 0));
+            0x13 => { // INC DE
+                let half_carry_bit = self.de.get_combined() & 0x0800 == 0x0800;
+                let new_de = self.de.get_combined() + 1;
+                self.de.set_combined(new_de);
+                self.af.set_flag_lo(Flags::Zero(new_de == 0));
                 self.af.set_flag_lo(Flags::Subtract(false));
-                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((self.bc.hi & 0x08) == 0x08)));
-                self.af.set_flag_lo(Flags::Carry(self.bc.lo == 0xff));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((new_de & 0x0800) == 0)));
+                self.af.set_flag_lo(Flags::Carry(new_de == 0));
+            }
+            0x3c | 0x04 | 0x0c | 0x14 | 0x1c | 0x24 | 0x2c => { // INC n
+                let (result, half_carry_bit) = {
+                    let reg = match opcode >> 3 {
+                        0 => { &mut self.bc.hi }
+                        1 => { &mut self.bc.lo }
+                        2 => { &mut self.de.hi }
+                        3 => { &mut self.de.lo }
+                        4 => { &mut self.hl.hi }
+                        5 => { &mut self.hl.lo }
+                        7 => { &mut self.af.hi }
+                        _ => { unreachable!() }
+                    };
+                    let half_carry_bit = (*reg & 0x08) == 0x08;
+                    *reg = (*reg).wrapping_add(1);
+                    (*reg, half_carry_bit)
+                };
+                self.af.set_flag_lo(Flags::Zero(result == 0));
+                self.af.set_flag_lo(Flags::Subtract(false));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((result & 0x08) == 0)));
+                self.af.set_flag_lo(Flags::Carry(result == 0));
+            }
+            0x3d | 0x05 | 0x0d | 0x15 | 0x1d | 0x25 | 0x2d => { // DEC n
+                let (result, half_carry_bit) = {
+                    let reg = match opcode >> 3 {
+                        0 => { &mut self.bc.hi }
+                        1 => { &mut self.bc.lo }
+                        2 => { &mut self.de.hi }
+                        3 => { &mut self.de.lo }
+                        4 => { &mut self.hl.hi }
+                        5 => { &mut self.hl.lo }
+                        7 => { &mut self.af.hi }
+                        _ => { unreachable!() }
+                    };
+                    let half_carry_bit = (*reg & 0x08) == 0;
+                    *reg = (*reg).wrapping_sub(1);
+                    (*reg, half_carry_bit)
+                };
+                self.af.set_flag_lo(Flags::Zero(result == 0));
+                self.af.set_flag_lo(Flags::Subtract(true));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((result & 0x08) == 0x08)));
+                self.af.set_flag_lo(Flags::Carry(result == 0xff));
             }
             0xc5 => { // PUSH BC
                 let value = self.bc.get_combined();
@@ -238,6 +284,26 @@ impl Cpu {
             0xc9 => { // RET
                 let addr = self.pop_stack_u16(memory);
                 self.pc = addr;
+            }
+            0xbf | 0xb8 | 0xb9 | 0xba | 0xbb | 0xbc | 0xbd | 0xbe => { // CP n
+                let compared_register = self.get_register_value(memory, opcode);
+                let half_carry_bit = (self.af.hi & 0x08) == 0;
+                let af_hi = self.af.hi;
+                let res = self.af.hi.wrapping_sub(compared_register);
+                self.af.set_flag_lo(Flags::Zero(res == 0));
+                self.af.set_flag_lo(Flags::Subtract(true));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((res & 0x08) == 0x08)));
+                self.af.set_flag_lo(Flags::Carry(res >= af_hi));
+            }
+            0xfe => { // CP #
+                let compared_value = self.read_u8_at_pc(memory);
+                let half_carry_bit = (self.af.hi & 0x08) == 0;
+                let af_hi = self.af.hi;
+                let res = self.af.hi.wrapping_sub(compared_value);
+                self.af.set_flag_lo(Flags::Zero(res == 0));
+                self.af.set_flag_lo(Flags::Subtract(true));
+                self.af.set_flag_lo(Flags::HalfCarry(half_carry_bit && ((res & 0x08) == 0x08)));
+                self.af.set_flag_lo(Flags::Carry(res >= af_hi));
             }
             _ => panic!("Unknown opcode: {:#x}", opcode)
         }
@@ -290,6 +356,12 @@ impl Cpu {
         return memory.read_u8(current_pc);
     }
 
+    fn read_i8_at_pc(&mut self, memory: &mut Memory) -> i8 {
+        let current_pc = self.pc;
+        self.pc += 1;
+        return memory.read_u8(current_pc) as i8;
+    }
+
     fn read_u16_at_pc(&mut self, memory: &mut Memory) -> u16 {
         let current_pc = self.pc;
         self.pc += 2;
@@ -329,10 +401,10 @@ impl ComboRegister {
 
     fn set_flag_lo(&mut self, flag: Flags) {
         match flag {
-            Flags::Zero(value) => { self.lo |= (value as u8) << 7 }
-            Flags::Subtract(value) => { self.lo |= (value as u8) << 6 }
-            Flags::HalfCarry(value) => { self.lo |= (value as u8) << 5 }
-            Flags::Carry(value) => { self.lo |= (value as u8) << 4 }
+            Flags::Zero(value) => { self.lo = (!(1<<7) & self.lo) | ((value as u8) << 7) }
+            Flags::Subtract(value) => { self.lo = (!(1<<6) & self.lo) | ((value as u8) << 6) }
+            Flags::HalfCarry(value) => { self.lo = (!(1<<5) & self.lo) | ((value as u8) << 5) }
+            Flags::Carry(value) => { self.lo = (!(1<<4) & self.lo) | ((value as u8) << 4) }
         }
     }
 
@@ -340,19 +412,19 @@ impl ComboRegister {
         match flag {
             Flags::Zero(value) => {
                 let check_bit = (value as u8) << 7;
-                (self.lo & check_bit) == check_bit
+                (self.lo & (1<<7)) == check_bit
             }
             Flags::Subtract(value) => {
                 let check_bit = (value as u8) << 6;
-                (self.lo & check_bit) == check_bit
+                (self.lo & (1<<6)) == check_bit
             }
             Flags::HalfCarry(value) => {
                 let check_bit = (value as u8) << 5;
-                (self.lo & check_bit) == check_bit
+                (self.lo & (1<<5)) == check_bit
             }
             Flags::Carry(value) => {
                 let check_bit = (value as u8) << 4;
-                (self.lo & check_bit) == check_bit
+                (self.lo & (1<<4)) == check_bit
             }
         }
     }
