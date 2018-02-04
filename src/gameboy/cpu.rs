@@ -110,6 +110,10 @@ impl Cpu {
                 let addr = 0xff00 + (self.read_u8_at_pc(memory) as u16);
                 memory.write_u8(addr, self.af.hi);
             }
+            0xf0 => { // LDH A, (n)
+                let addr = 0xff00 + (self.read_u8_at_pc(memory) as u16);
+                self.af.hi = memory.read_u8(addr);
+            }
             0xea => { // LD (nn), A
                 let addr = self.read_u16_at_pc(memory);
                 memory.write_u8(addr, self.af.hi);
@@ -123,6 +127,7 @@ impl Cpu {
                 self.hl.set_combined(address + 1);
              }
             0x0e => { self.bc.lo = self.read_u8_at_pc(memory) } // LD C, n
+            0x1e => { self.de.lo = self.read_u8_at_pc(memory) } // LD E, n
             0x2e => { self.hl.lo = self.read_u8_at_pc(memory) } // LD L, n
             0x3e => { self.af.hi = self.read_u8_at_pc(memory) } // LD A, n
             0x40 => { self.bc.hi = self.bc.hi; } // LD B, B
