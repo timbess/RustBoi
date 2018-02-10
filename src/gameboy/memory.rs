@@ -5,7 +5,6 @@ pub struct Memory {
     mapped_io: Box<[u8]>,
     zero_page: Box<[u8]>,
     rom: Box<[u8]>,
-    executed_bootloader: bool
 }
 
 const RAM_SIZE: usize = 8 * 1024;
@@ -21,7 +20,6 @@ impl Memory {
             mapped_io: vec![0; MEMORY_MAPPED_IO].into_boxed_slice(),
             zero_page: vec![0; ZERO_PAGE_SIZE].into_boxed_slice(),
             rom: rom.into_boxed_slice(),
-            executed_bootloader: false
         }
     }
 
@@ -68,6 +66,7 @@ impl Memory {
                ((self.read_u8(addr) as u16));
     }
 
+    #[allow(dead_code)]
     pub fn dump(&self) {
         for bytes in Vec::from(self.main_ram.as_ref()).chunks(15) {
             for byte in bytes {
