@@ -1,6 +1,6 @@
 [package]
 name = "rust_boi"
 version = "0.1.0"
-authors = ["tbess <timothy.bess@ignitionone.com>"]
+authors = ["tbess <tdbgamer@gmail.com>"]
 
 [dependencies]
