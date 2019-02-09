@@ -25,7 +25,7 @@ impl Cpu {
     pub fn step(&mut self, memory: &mut Memory) {
         let opcode_addr = self.pc;
         let opcode = self.read_u8_at_pc(memory);
-        println!("{:#x} opcode: {:#x}", opcode_addr, opcode);
+        debug!("{:#x} opcode: {:#x}", opcode_addr, opcode);
         match opcode {
             0xaf | 0xa8 | 0xa9 | 0xaa | 0xab | 0xac | 0xad | 0xae => { // XOR a
                 self.af.hi ^= self.get_register_value(memory, opcode);
@@ -42,7 +42,7 @@ impl Cpu {
             }
             0xcb => { // Special multibyte instructions
                 let special_op = self.read_u8_at_pc(memory);
-                println!("Special opcode: {:#x}", special_op);
+                debug!("Special opcode: {:#x}", special_op);
                 match special_op {
                     0x40 ... 0x7f => { // BIT b, r operations
                         let bit_to_check = (special_op - 0x40) / 0x08;
@@ -83,12 +83,12 @@ impl Cpu {
                     }
                     _ => { panic!("Invalid Jump opcode: {:#x}", opcode); }
                 }
-                println!("Jumping by offset: '{:#x}'", offset);
+                debug!("Jumping by offset: '{:#x}'", offset);
                 self.pc = (self.pc as i16 + offset as i16) as u16;
             }
             0x18 => { // JR n
                 let offset = self.read_i8_at_pc(memory);
-                println!("Jumping by offset: '{:#x}'", offset);
+                debug!("Jumping by offset: '{:#x}'", offset);
                 self.pc = (self.pc as i16 + offset as i16) as u16;
             }
             0x01 => { // LD BC, nn
@@ -211,7 +211,7 @@ impl Cpu {
                     }
                     _ => { panic!("Invalid Call opcode: {:#x}", opcode); }
                 }
-                println!("jumping to: {:#x}", jump_to_addr);
+                debug!("jumping to: {:#x}", jump_to_addr);
                 self.call(memory, jump_to_addr);
             }
             0xcd => { // CALL nn
